@@ -17,7 +17,7 @@ parser.add_argument("--num_workers", help="number of workers", default=4, type=i
 parser.add_argument("--context_length", help="sets the context length of the clip model", default=8, type=int)
 parser.add_argument("--attr_dropout", help="add dropout to attributes", type=float, default=0.3)
 parser.add_argument("--yml_path", help="yml path", type=str)
-parser.add_argument("--clip_arch", help="clip path", type=str)
+parser.add_argument("--clip_arch", help="clip path", default="clip_modules/ViT-L-14.pt", type=str)
 parser.add_argument("--dataset_path", help="dataset path", type=str)
 parser.add_argument("--save_path", help="save path", type=str)
 parser.add_argument("--save_every_n", default=5, type=int, help="saves the model every n epochs")
