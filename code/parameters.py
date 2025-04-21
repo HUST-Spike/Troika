@@ -2,6 +2,11 @@ import argparse
 
 parser = argparse.ArgumentParser()
 
+YML_PATH = {
+    "mit-states": './config/mit-states.yml',
+    "ut-zappos": './config/ut-zappos.yml',
+    "cgqa": './config/cgqa.yml'
+}
 
 # model config
 parser.add_argument("--model_name", help="model name", type=str)

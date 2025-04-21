@@ -11,7 +11,7 @@ from torch.nn.modules.loss import CrossEntropyLoss
 from torch.utils.data.dataloader import DataLoader
 import torch.nn.functional as F
 from model.model_factory import get_model
-from parameters import parser
+from parameters import parser, YML_PATH
 
 # from test import *
 import test as test
@@ -133,8 +133,7 @@ def evaluate(model, dataset, config):
 
 if __name__ == "__main__":
     config = parser.parse_args()
-    if config.yml_path:
-        load_args(config.yml_path, config)
+    load_args(YML_PATH[config.dataset], config)
     print(config)
     # set the seed value
     set_seed(config.seed)
