@@ -20,6 +20,7 @@ model:
 train:
   dataset: ut-zappos
   # dataset_path: 
+  dataset_path: data/ut-zappos
   optimizer: Adam
   scheduler: StepLR
   step_size: 5

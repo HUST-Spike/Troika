@@ -20,6 +20,7 @@ model:
 train:
   dataset: mit-states
   # dataset_path: 
+  dataset_path: data/mit-states
   optimizer: Adam
   scheduler: StepLR
   step_size: 5
