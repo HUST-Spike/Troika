@@ -3,9 +3,9 @@ import argparse
 parser = argparse.ArgumentParser()
 
 YML_PATH = {
-    "mit-states": './config/mit-states.yml',
-    "ut-zappos": './config/ut-zappos.yml',
-    "cgqa": './config/cgqa.yml'
+    "mit-states": './config/troika/mit-states.yml',
+    "ut-zappos": './config/troika/ut-zappos.yml',
+    "cgqa": './config/troika/cgqa.yml'
 }
 
 # model config
@@ -14,9 +14,9 @@ parser.add_argument("--lr", help="learning rate", type=float, default=5e-05)
 parser.add_argument("--dataset", help="name of the dataset", type=str, default='mit-states')
 parser.add_argument("--weight_decay", help="weight decay", type=float, default=1e-05)
 parser.add_argument("--clip_model", help="clip model type", type=str, default="ViT-L/14")
-parser.add_argument("--epochs", help="number of epochs", default=20, type=int)
+parser.add_argument("--epochs", help="number of epochs", default=15, type=int)
 parser.add_argument("--epoch_start", help="start epoch", default=0, type=int)
-parser.add_argument("--train_batch_size", help="train batch size", default=48, type=int)
+parser.add_argument("--train_batch_size", help="train batch size", default=32, type=int)
 parser.add_argument("--eval_batch_size", help="eval batch size", default=16, type=int)
 parser.add_argument("--num_workers", help="number of workers", default=10, type=int)
 parser.add_argument("--context_length", help="sets the context length of the clip model", default=8, type=int)
