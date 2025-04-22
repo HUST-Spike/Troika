@@ -23,7 +23,7 @@ def setup_logger(config, mode="train", extra_info=None):
         filename_parts.append(str(config.lr))
         filename_parts.append(str(config.context_length))
     if mode == "test":
-        filename_parts.append(str(config.open_world))
+        filename_parts.append("open_world" + str(config.open_world))
     if extra_info:
         filename_parts.append(str(extra_info))
     filename_parts.append(timestamp)
