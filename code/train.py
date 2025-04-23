@@ -97,21 +97,23 @@ def train_model(model, optimizer, config, train_dataset, val_dataset, test_datas
         print("Loss average on val dataset: {}".format(val_result['loss']))
         logger.info(f"验证集平均损失: {val_result['loss']:.6f}")
 
-        if config.val_metric == 'best_loss' and val_result[config.val_metric] < best_loss:
-            best_loss = val_result['best_loss']
-            logger.info(f"发现新的最佳模型 (损失: {best_loss:.6f})")
-            best_epoch = i
-            best_model_path = os.path.join(config.save_path, f"best.pt")
-            torch.save(model.state_dict(), best_model_path)
-            logger.info(f"最佳模型保存至: {best_model_path}")
+        if config.val_metric == 'best_loss':
+            if val_result['loss'] < best_loss:
+                best_loss = val_result['loss']
+                logger.info(f"发现新的最佳模型 (损失: {best_loss:.6f})")
+                best_epoch = i
+                best_model_path = os.path.join(config.save_path, f"best.pt")
+                torch.save(model.state_dict(), best_model_path)
+                logger.info(f"最佳模型保存至: {best_model_path}")
 
-        if config.val_metric != 'best_loss' and val_result[config.val_metric] > best_metric:
-            best_metric = val_result[config.val_metric]
-            best_epoch = i
-            logger.info(f"发现新的最佳模型 ({config.best_model_metric}: {best_metric:.4f})")
-            best_model_path = os.path.join(config.save_path, f"best.pt")
-            torch.save(model.state_dict(), best_model_path)
-            logger.info(f"最佳模型保存至: {best_model_path}")
+        else:
+            if val_result[config.val_metric] > best_metric:
+                best_metric = val_result[config.val_metric]
+                best_epoch = i
+                logger.info(f"发现新的最佳模型 ({config.val_metric}: {best_metric:.4f})")
+                best_model_path = os.path.join(config.save_path, f"best.pt")
+                torch.save(model.state_dict(), best_model_path)
+                logger.info(f"最佳模型保存至: {best_model_path}")
 
         final_model_state = model.state_dict()
         if i + 1 == config.epochs:
@@ -163,10 +165,8 @@ if __name__ == "__main__":
     # 模型保存路径
     timestamp = datetime.datetime.now().strftime("%m%d_%H%M")
     path_components = [
-        "train",
         config.dataset,
         config.clip_model,
-        f"bs{config.train_batch_size}",
         timestamp
     ]
     path_components = [comp for comp in path_components if comp]

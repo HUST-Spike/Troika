@@ -35,7 +35,7 @@ train:
   # epochs: 15
   epoch_start: 0
   # save_path: 
-  val_metric: AUC
+  val_metric: best_hm
   save_final_model: True
   # load_model: False     # False or model path
 

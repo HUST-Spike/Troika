@@ -17,11 +17,8 @@ def setup_logger(config, mode="train", extra_info=None):
     """
     # 创建日志文件名，包含实验参数
     timestamp = datetime.datetime.now().strftime("%m%d_%H%M")
-    filename_parts = [mode, "log", config.fusion, config.dataset, config.clip_model]
-    if mode == "train":
-        filename_parts.append(str(config.train_batch_size))
-        filename_parts.append(str(config.lr))
-        filename_parts.append(str(config.context_length))
+    filename_parts = [mode, config.dataset, config.clip_model]
+    # if mode == "train":
     if mode == "test":
         filename_parts.append("open_world" + str(config.open_world))
     if extra_info:
@@ -63,10 +60,10 @@ def setup_logger(config, mode="train", extra_info=None):
     #logger.addHandler(console_handler)
     
     # 记录初始配置信息
+    logging.info(f"额外信息:{config.extra_info}")
     logging.info(f"开始新的{mode}实验 - 配置参数:")
     logging.info(f"模式: {mode}")
     logging.info(f"数据集: {config.dataset}")
-    logging.info(f"融合方式: {config.fusion}")
     if mode == "train":
         logging.info(f"批次大小: {config.train_batch_size}")
         logging.info(f"学习率: {config.lr}")
