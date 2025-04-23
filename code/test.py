@@ -647,8 +647,8 @@ if __name__ == "__main__":
     offset = len(attributes)
 
     model = get_model(config, attributes=attributes, classes=classes, offset=offset).cuda()
-    if config.load_model:
-        model.load_state_dict(torch.load(config.load_model))
+    model.load_state_dict(torch.load(config.load_model))
+
     predict_logits_func = predict_logits
     # ? can be deleted if not needed
     if (hasattr(config, 'text_first') and config.text_first):
@@ -783,18 +783,17 @@ if __name__ == "__main__":
     if best_th is not None:
         results['best_threshold'] = best_th
 
-    if config.load_model:
-        title = config.load_model[:-2]
-    else:
-        os.makedirs(config.save_path, exist_ok=True)
-        title = config.save_path + '/'
+    '''
     if config.open_world:
-        result_path = title + "open.calibrated.json"
+        result_path = config.load_model[:-2] + "open.calibrated.json"
     else:
-        result_path = title + "closed.json"
+        result_path = config.load_model[:-2] + "closed.json"
 
     with open(result_path, 'w+') as fp:
         json.dump(results, fp)
+    '''
 
     print("done!")
+    logger.info(results)
+    logger.info("评估完成")
     log_section("评估完成")

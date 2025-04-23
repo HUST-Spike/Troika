@@ -41,7 +41,7 @@ train:
 
 test:
   eval_batch_size: 64
-  open_world: False
+  # open_world: False
   # load_model: 
   topk: 1
   text_encoder_batch_size: 1024
