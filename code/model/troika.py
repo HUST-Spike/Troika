@@ -192,6 +192,10 @@ class Troika(nn.Module):
         self.lamda = nn.Parameter(torch.ones(output_dim) * config.init_lamda)
         self.patch_norm = nn.LayerNorm(output_dim)
 
+        self.use_comp_branch = not config.disable_comp
+        self.use_attr_branch = not config.disable_attr
+        self.use_obj_branch = not config.disable_obj
+
 
     def add_visual_tunable_params(self):
         adapter_num = 2 * self.clip.visual.transformer.layers
@@ -322,19 +326,36 @@ class Troika(nn.Module):
     def loss_calu(self, predict, target):
         loss_fn = CrossEntropyLoss()
         _, batch_attr, batch_obj, batch_target = target
-        comp_logits, attr_logits, obj_logits = predict
+        # 为了消融实验的修改
+        # comp_logits, attr_logits, obj_logits = predict
         batch_attr = batch_attr.cuda()
         batch_obj = batch_obj.cuda()
         batch_target = batch_target.cuda()
+
+        '''
         loss_comp = loss_fn(comp_logits, batch_target)
         loss_attr = loss_fn(attr_logits, batch_attr)
         loss_obj = loss_fn(obj_logits, batch_obj)
         loss = loss_comp * self.config.pair_loss_weight +\
                loss_attr * self.config.attr_loss_weight +\
                loss_obj * self.config.obj_loss_weight
+        '''
+        loss = 0
+        predict_idx = 0
+        if self.use_comp_branch:
+            loss += loss_fn(predict[predict_idx], batch_target) * self.config.pair_loss_weight
+            predict_idx += 1
+    
+        if self.use_attr_branch:
+            loss += loss_fn(predict[predict_idx], batch_attr) * self.config.attr_loss_weight
+            predict_idx += 1
+        
+        if self.use_obj_branch:
+            loss += loss_fn(predict[predict_idx], batch_obj) * self.config.obj_loss_weight
+
         return loss
 
-
+    '''
     def logit_infer(self, predict, pairs):
         comp_logits, attr_logits, obj_logits = predict
         attr_pred = F.softmax(attr_logits, dim=-1)
@@ -344,6 +365,41 @@ class Troika(nn.Module):
             weighted_obj_pred = 1 if self.config.obj_inference_weight == 0 else obj_pred[:, pairs[i_comp][1]] * self.config.obj_inference_weight
             comp_logits[:, i_comp] = comp_logits[:, i_comp] * self.config.pair_inference_weight + weighted_attr_pred * weighted_obj_pred
         return comp_logits
+    '''
+    def logit_infer(self, predict, pairs):
+        # 根据分支状态确定预测结果的位置
+        predict_idx = 0
+        
+        if self.use_comp_branch:
+            comp_logits = predict[predict_idx].clone()
+            predict_idx += 1
+        else:
+            # 创建一个零张量作为组合分支的结果
+            comp_logits = torch.zeros((predict[0].shape[0], len(pairs)), device=predict[0].device)
+        
+        # 只有当状态和对象分支都启用时才进行加权
+        if self.use_attr_branch and self.use_obj_branch:
+            attr_idx = predict_idx
+            obj_idx = predict_idx + 1
+            
+            if attr_idx < len(predict) and obj_idx < len(predict):
+                attr_logits = predict[attr_idx]
+                obj_logits = predict[obj_idx]
+                
+                attr_pred = F.softmax(attr_logits, dim=-1)
+                obj_pred = F.softmax(obj_logits, dim=-1)
+                
+                for i_comp in range(comp_logits.shape[-1]):
+                    weighted_attr_pred = 1 if self.config.attr_inference_weight == 0 else attr_pred[:, pairs[i_comp][0]] * self.config.attr_inference_weight
+                    weighted_obj_pred = 1 if self.config.obj_inference_weight == 0 else obj_pred[:, pairs[i_comp][1]] * self.config.obj_inference_weight
+                    
+                    if self.use_comp_branch:
+                        comp_logits[:, i_comp] = comp_logits[:, i_comp] * self.config.pair_inference_weight + weighted_attr_pred * weighted_obj_pred
+                    else:
+                        comp_logits[:, i_comp] = weighted_attr_pred * weighted_obj_pred
+        
+        return comp_logits
+
 
     
     def encode_text_for_open(self, idx):
@@ -397,7 +453,16 @@ class Troika(nn.Module):
                 normalized_img_features[i_element] @ (idx_text_features * self.clip.logit_scale.exp()).t()
         )
         '''
-        return logits
+        # return logits
+        results = []
+        if self.use_comp_branch and len(logits) > 0:
+            results.append(logits[0])
+        if self.use_attr_branch and len(logits) > 1:
+            results.append(logits[1])
+        if self.use_obj_branch and len(logits) > 2:
+            results.append(logits[2])
+        
+        return results
 
 
     def forward(self, batch, idx):
@@ -444,4 +509,13 @@ class Troika(nn.Module):
                 normalized_img_features[i_element] @ (idx_text_features * self.clip.logit_scale.exp()).t()
         )
         '''
-        return logits
+        # return logits
+        results = []
+        if self.use_comp_branch and len(logits) > 0:
+            results.append(logits[0])
+        if self.use_attr_branch and len(logits) > 1:
+            results.append(logits[1])
+        if self.use_obj_branch and len(logits) > 2:
+            results.append(logits[2])
+        
+        return results

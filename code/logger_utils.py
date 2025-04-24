@@ -61,6 +61,7 @@ def setup_logger(config, mode="train", extra_info=None):
     
     # 记录初始配置信息
     logging.info(f"额外信息:{config.extra_info}")
+    logger.info(f"实验配置: 组合分支禁用={config.disable_comp}, 属性分支禁用={config.disable_attr}, 对象分支禁用={config.disable_obj}")
     logging.info(f"开始新的{mode}实验 - 配置参数:")
     logging.info(f"模式: {mode}")
     logging.info(f"数据集: {config.dataset}")
