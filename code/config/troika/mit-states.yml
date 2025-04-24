@@ -40,12 +40,12 @@ train:
   # load_model: False     # False or model path
 
 test:
-  eval_batch_size: 32
+  eval_batch_size: 16
   # open_world: False
   # load_model: 
   topk: 1
   text_encoder_batch_size: 1024
-  # threshold: 0.4
+  threshold: 0.4
   threshold_trials: 50
   bias: 0.001
   text_first: True

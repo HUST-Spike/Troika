@@ -374,7 +374,7 @@ class Troika(nn.Module):
         logits = list()
         for i_element in range(self.token_ids.shape[0]):
             idx_text_features = text_feats[i_element]
-
+            
             # CMT
             cmt_text_features = idx_text_features.unsqueeze(0).expand(b, -1, -1)
             batch_patch = self.patch_norm(batch_patch)
@@ -392,6 +392,11 @@ class Troika(nn.Module):
                     normalized_img_features[i_element], 
                     cmt_text_features * self.clip.logit_scale.exp()
             ))
+            '''
+            logits.append(
+                normalized_img_features[i_element] @ (idx_text_features * self.clip.logit_scale.exp()).t()
+        )
+        '''
         return logits
 
 
@@ -416,7 +421,7 @@ class Troika(nn.Module):
             idx_text_features = _text_features / _text_features.norm(
                 dim=-1, keepdim=True
             )
-
+            
             # CMT
             cmt_text_features = idx_text_features.unsqueeze(0).expand(b, -1, -1)
             batch_patch = self.patch_norm(batch_patch)
@@ -434,5 +439,9 @@ class Troika(nn.Module):
                     normalized_img_features[i_element], 
                     cmt_text_features * self.clip.logit_scale.exp()
             ))
-
+            '''
+            logits.append(
+                normalized_img_features[i_element] @ (idx_text_features * self.clip.logit_scale.exp()).t()
+        )
+        '''
         return logits
