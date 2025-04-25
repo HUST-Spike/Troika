@@ -422,6 +422,91 @@ def evaluate_and_print_results(model_name, dataset, evaluator, logits,
     return stats
 
 
+def calculate_and_print_improvement(dfsp_stats, troika_stats, fusion_stats, best_weight, metrics_to_compare, logger):
+    """计算并打印融合模型相对于基础模型的性能提升
+    
+    Args:
+        dfsp_stats: DFSP模型的评估结果
+        troika_stats: Troika模型的评估结果
+        fusion_stats: 融合模型的评估结果
+        best_weight: 最佳融合权重
+        metrics_to_compare: 需要比较的指标列表
+        logger: 日志记录器
+        
+    Returns:
+        dict: 包含所有比较结果的字典
+    """
+    log_section("融合模型提升百分比")
+    print("\n融合模型相对于基础模型的提升百分比:")
+    logger.info("融合模型相对于基础模型的提升百分比:")
+
+    # 创建一个表格格式的输出
+    header = f"{'指标':<15} | {'DFSP':<10} | {'Troika':<10} | {'融合':<10} | {'vs DFSP':<10} | {'vs Troika':<10}"
+    separator = "-" * len(header)
+    
+    print(separator)
+    print(header)
+    print(separator)
+    
+    logger.info(separator)
+    logger.info(header)
+    logger.info(separator)
+    
+    # 存储改进百分比
+    improvements = {
+        'vs_dfsp': {},
+        'vs_troika': {}
+    }
+    
+    for metric in metrics_to_compare:
+        if metric in fusion_stats and metric in dfsp_stats and metric in troika_stats:
+            dfsp_value = dfsp_stats[metric]
+            troika_value = troika_stats[metric]
+            fusion_value = fusion_stats[metric]
+            
+            # 计算提升百分比
+            vs_dfsp = (fusion_value - dfsp_value) / dfsp_value * 100 if dfsp_value != 0 else float('inf')
+            vs_troika = (fusion_value - troika_value) / troika_value * 100 if troika_value != 0 else float('inf')
+            
+            # 存储改进
+            if dfsp_value != 0:
+                improvements['vs_dfsp'][metric] = vs_dfsp
+            if troika_value != 0:
+                improvements['vs_troika'][metric] = vs_troika
+            
+            # 格式化输出
+            row = f"{metric:<15} | {dfsp_value:<10.4f} | {troika_value:<10.4f} | {fusion_value:<10.4f} | {vs_dfsp:+<10.2f}% | {vs_troika:+<10.2f}%"
+            print(row)
+            logger.info(row)
+    
+    print(separator)
+    logger.info(separator)
+    
+    # 输出总结
+    best_base_model = "DFSP" if dfsp_stats['best_hm'] > troika_stats['best_hm'] else "Troika"
+    best_base_hm = max(dfsp_stats['best_hm'], troika_stats['best_hm'])
+    hm_improvement = (fusion_stats['best_hm'] - best_base_hm) / best_base_hm * 100
+    
+    summary = f"总结: 融合模型在最佳基础模型({best_base_model})上提升了HM指标 {hm_improvement:.2f}%"
+    print(f"\n{summary}")
+    logger.info(f"\n{summary}")
+    
+    # 构建结果字典
+    results = {
+        'test': {
+            'dfsp': dfsp_stats,
+            'troika': troika_stats,
+            'fusion': fusion_stats
+        },
+        'fusion_weight': float(best_weight),
+        'improvement': improvements,
+        'best_base_model': best_base_model,
+        'hm_improvement': hm_improvement
+    }
+    
+    return results
+
+
 def main():
     # 添加融合模型的参数
     parser.add_argument('--dfsp_model_path', type=str, required=True, help='DFSP模型路径')
@@ -549,6 +634,8 @@ def main():
     print(result)
     
     test_dataset, _, _, _ = load_dataset_and_prepare_metadata(config, 'test', logger)
+    
+    
     # 在测试集上评估
     print('在测试集上评估融合模型')
     log_section('在测试集上评估融合模型')
@@ -603,74 +690,28 @@ def main():
         best_th, unseen_scores, logger
     )
     
+ 
     # 计算并展示提升百分比
-    log_section("融合模型提升百分比")
-    print("\n融合模型相对于基础模型的提升百分比:")
-    logger.info("融合模型相对于基础模型的提升百分比:")
-
     metrics_to_compare = ['best_hm', 'best_seen', 'best_unseen', 'AUC']
-    
-    # 创建一个表格格式的输出
-    header = f"{'指标':<15} | {'DFSP':<10} | {'Troika':<10} | {'融合':<10} | {'vs DFSP':<10} | {'vs Troika':<10}"
-    separator = "-" * len(header)
-    
-    print(separator)
-    print(header)
-    print(separator)
-    
-    logger.info(separator)
-    logger.info(header)
-    logger.info(separator)
-    
-    for metric in metrics_to_compare:
-        if metric in fusion_test_stats and metric in dfsp_test_stats and metric in troika_test_stats:
-            dfsp_value = dfsp_test_stats[metric]
-            troika_value = troika_test_stats[metric]
-            fusion_value = fusion_test_stats[metric]
-            
-            # 计算提升百分比
-            vs_dfsp = (fusion_value - dfsp_value) / dfsp_value * 100 if dfsp_value != 0 else float('inf')
-            vs_troika = (fusion_value - troika_value) / troika_value * 100 if troika_value != 0 else float('inf')
-            
-            # 格式化输出
-            row = f"{metric:<15} | {dfsp_value:<10.4f} | {troika_value:<10.4f} | {fusion_value:<10.4f} | {vs_dfsp:+<10.2f}% | {vs_troika:+<10.2f}%"
-            print(row)
-            logger.info(row)
-    
-    print(separator)
-    logger.info(separator)
-    
-    # 输出总结
-    best_base_model = "DFSP" if dfsp_test_stats['best_hm'] > troika_test_stats['best_hm'] else "Troika"
-    best_base_hm = max(dfsp_test_stats['best_hm'], troika_test_stats['best_hm'])
-    hm_improvement = (fusion_test_stats['best_hm'] - best_base_hm) / best_base_hm * 100
-    
-    summary = f"总结: 融合模型在最佳基础模型({best_base_model})上提升了HM指标 {hm_improvement:.2f}%"
-    print(f"\n{summary}")
-    logger.info(f"\n{summary}")
-    
-    # 汇总所有结果
+    improvement_results = calculate_and_print_improvement(
+        dfsp_test_stats, troika_test_stats, fusion_test_stats, 
+        best_weight, metrics_to_compare, logger
+    )
+
+    # 构建完整结果
     results = {
         'val': val_stats,
-        'test': {
-            'dfsp': dfsp_test_stats,
-            'troika': troika_test_stats,
-            'fusion': fusion_test_stats
-        },
-        'fusion_weight': float(best_weight),
-        'improvement': {
-            'vs_dfsp': {metric: (fusion_test_stats[metric] - dfsp_test_stats[metric]) / dfsp_test_stats[metric] * 100 
-                       for metric in metrics_to_compare if metric in fusion_test_stats and metric in dfsp_test_stats and dfsp_test_stats[metric] != 0},
-            'vs_troika': {metric: (fusion_test_stats[metric] - troika_test_stats[metric]) / troika_test_stats[metric] * 100 
-                         for metric in metrics_to_compare if metric in fusion_test_stats and metric in troika_test_stats and troika_test_stats[metric] != 0}
-        }
+        **improvement_results
     }
     
     if best_th is not None:
         results['best_threshold'] = float(best_th)
     
     # 保存详细结果到JSON文件
-    results_path = os.path.join(config.exp_dir, f'fusion_results_{time.strftime("%Y%m%d_%H%M%S")}.json')
+    fusion_log_dir = f'fusion_log/{config.dataset}{"_open_" if config.open_world else "_closed_"}'
+    os.makedirs(fusion_log_dir, exist_ok=True)
+
+    results_path = os.path.join(fusion_log_dir, f'{time.strftime("%m%d_%H%M")}.json')
     with open(results_path, 'w') as f:
         json.dump(results, f, indent=4)
     
