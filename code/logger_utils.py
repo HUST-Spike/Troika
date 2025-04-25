@@ -19,7 +19,7 @@ def setup_logger(config, mode="train", extra_info=None):
     timestamp = datetime.datetime.now().strftime("%m%d_%H%M")
     filename_parts = [mode, config.dataset, config.clip_model]
     # if mode == "train":
-    if mode == "test":
+    if mode == "test" or mode == "fusion_test":
         filename_parts.append("open_world" + str(config.open_world))
     if extra_info:
         filename_parts.append(str(extra_info))

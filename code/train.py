@@ -124,10 +124,11 @@ def train_model(model, optimizer, config, train_dataset, val_dataset, test_datas
             )))
             evaluate(model, test_dataset, config, logger)
 
-
+    '''
     final_model_path = os.path.join(config.save_path, f'final_model.pt')
     torch.save(final_model_state, final_model_path)
     logger.info(f"最终模型保存至: {final_model_path}")
+    '''
 
 
 def evaluate(model, dataset, config, logger):
