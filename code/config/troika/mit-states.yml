@@ -40,7 +40,7 @@ train:
   # load_model: False     # False or model path
 
 test:
-  eval_batch_size: 16
+  eval_batch_size: 8
   # open_world: False
   # load_model: 
   topk: 1

@@ -16,6 +16,8 @@ model:
   attr_inference_weight: 1.0
   obj_loss_weight: 1.0
   obj_inference_weight: 1.0
+  # width_img: 1024
+  # width_txt: 768
 
 train:
   dataset: ut-zappos
@@ -32,7 +34,7 @@ train:
   train_batch_size: 32   # 64
   gradient_accumulation_steps: 1
   # seed: 
-  epochs: 15
+  epochs: 10
   epoch_start: 0
   # save_path: 
   val_metric: best_hm
