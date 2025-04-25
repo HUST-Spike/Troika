@@ -37,7 +37,7 @@ parser.add_argument("--disable_comp", type=bool, default=False, help="禁用组�
 parser.add_argument("--disable_attr", type=bool, default=False, help="禁用属性")
 parser.add_argument("--disable_obj", type=bool, default=False, help="禁用对象")
 
-parser.add_argument("--open_world", help="evaluate on open world setup", type=bool, default=False)
+parser.add_argument('--open_world', action='store_true', help='是否使用开放世界设置')
 parser.add_argument("--bias", help="eval bias", type=float, default=1e3)
 parser.add_argument("--topk", help="eval topk", type=int, default=1)
 parser.add_argument("--text_encoder_batch_size", help="batch size of the text encoder", default=16, type=int)
