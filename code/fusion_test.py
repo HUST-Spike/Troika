@@ -47,6 +47,7 @@ def clear_gpu_memory(model=None, model_name=None, logger=None):
     torch.cuda.empty_cache()
     gc.collect()
 
+
 def load_dataset_and_prepare_metadata(config, phase, logger):
     """加载数据集并准备元数据
     Returns:
@@ -70,6 +71,7 @@ def load_dataset_and_prepare_metadata(config, phase, logger):
     offset = len(attributes)
     
     return dataset, attributes, classes, offset
+
 
 def load_dfsp_model(dfsp_config, config, attributes, classes, offset, logger):
     """
@@ -288,6 +290,7 @@ def find_best_weight(val_dataset, evaluator, dfsp_logits, troika_logits,
     
     return best_weight, best_stats
 
+
 def setup_open_world_threshold(config, val_dataset, val_logits, val_attr_gt, 
                               val_obj_gt, val_pair_gt, evaluator, logger):
     """设置开放世界模式的阈值和不可行性分数
@@ -352,6 +355,72 @@ def setup_open_world_threshold(config, val_dataset, val_logits, val_attr_gt,
             logger.info(f'新的最佳阈值: {best_th:.4f}, AUC: {best_auc:.4f}')
     
     return best_th, unseen_scores
+
+
+def evaluate_and_print_results(model_name, dataset, evaluator, logits, 
+                              attr_gt, obj_gt, pair_gt, config, best_th=None, 
+                              unseen_scores=None, logger=None):
+    """评估模型性能并打印结果
+    
+    Args:
+        model_name: 模型名称 (用于日志输出)
+        dataset: 数据集对象
+        evaluator: 评估器对象
+        logits: 模型预测的logits
+        attr_gt, obj_gt, pair_gt: 真实标签
+        config: 配置对象
+        best_th: 最佳阈值 (如果为None则不应用阈值)
+        unseen_scores: 不可行性分数 (在开放世界设置中使用)
+        logger: 日志记录器
+        
+    Returns:
+        dict: 评估结果统计信息
+    """
+    # 记录评估开始
+    log_section(f"{model_name}模型评估结果")
+    print(f'评估{model_name}模型')
+    if logger:
+        logger.info(f'评估{model_name}模型')
+    
+    # 克隆logits以避免修改原始数据
+    logits_eval = logits.clone()
+    
+    # 如果是开放世界设置且有阈值，应用阈值
+    if config.open_world and best_th is not None:
+        logits_eval = threshold_with_feasibility(
+            logits_eval,
+            dataset.seen_mask,
+            threshold=best_th,
+            feasiblity=unseen_scores)
+    
+    # 执行评估
+    stats = test(
+        dataset,
+        evaluator,
+        logits_eval,
+        attr_gt,
+        obj_gt,
+        pair_gt,
+        config
+    )
+    
+    # 打印结果
+    print(f"\n{model_name}模型评估结果:")
+    if logger:
+        logger.info(f"{model_name}模型评估结果:")
+        
+    for key, value in stats.items():
+        if isinstance(value, (int, float)):
+            print(f"  {key}: {value:.4f}")
+            if logger:
+                logger.info(f"  {key}: {value:.4f}")
+        else:
+            print(f"  {key}: {value}")
+            if logger:
+                logger.info(f"  {key}: {value}")
+                
+    return stats
+
 
 def main():
     # 添加融合模型的参数
@@ -493,40 +562,12 @@ def main():
     dfsp_test_logits, test_attr_gt, test_obj_gt, test_pair_gt = predict_logits_dfsp(
         dfsp_model, test_dataset, dfsp_config)
     
-    # 在测试集上评估DFSP模型
-    log_section("DFSP模型在测试集上的评估结果")
-    print('在测试集上评估DFSP模型')
-    logger.info('在测试集上评估DFSP模型')
-
-    # 如果是开放世界设置且有阈值，应用阈值到DFSP预测
-    dfsp_test_logits_eval = dfsp_test_logits.clone()
-    if config.open_world and best_th is not None:
-        dfsp_test_logits_eval = threshold_with_feasibility(
-            dfsp_test_logits_eval,
-            test_dataset.seen_mask,
-            threshold=best_th,
-            feasiblity=unseen_scores)
-
-    dfsp_test_stats = test(
-        test_dataset,
-        test_evaluator,
-        dfsp_test_logits_eval,
-        test_attr_gt,
-        test_obj_gt,
-        test_pair_gt,
-        config
+    # 在测试集上评估DFSP模型并打印相关信息
+    dfsp_test_stats = evaluate_and_print_results(
+        "DFSP", test_dataset, test_evaluator, dfsp_test_logits,
+        test_attr_gt, test_obj_gt, test_pair_gt, config,
+        best_th, unseen_scores, logger
     )
-
-    # 输出DFSP测试结果
-    print("\nDFSP模型测试结果:")
-    logger.info("DFSP模型测试结果:")
-    for key, value in dfsp_test_stats.items():
-        if isinstance(value, (int, float)):
-            print(f"  {key}: {value:.4f}")
-            logger.info(f"  {key}: {value:.4f}")
-        else:
-            print(f"  {key}: {value}")
-            logger.info(f"  {key}: {value}")
 
     # 释放DFSP模型占用的显存
     clear_gpu_memory(dfsp_model, "DFSP", logger)
@@ -540,40 +581,12 @@ def main():
     troika_test_logits, _, _, _, _ = predict_logits_troika(
         troika_model, test_dataset, config)
     
-    # 在测试集上评估Troika模型
-    log_section("Troika模型在测试集上的评估结果")
-    print('在测试集上评估Troika模型')
-    logger.info('在测试集上评估Troika模型')
-
-    # 如果是开放世界设置且有阈值，应用阈值到Troika预测
-    troika_test_logits_eval = troika_test_logits.clone()
-    if config.open_world and best_th is not None:
-        troika_test_logits_eval = threshold_with_feasibility(
-            troika_test_logits_eval,
-            test_dataset.seen_mask,
-            threshold=best_th,
-            feasiblity=unseen_scores)
-    
-    troika_test_stats = test(
-        test_dataset,
-        test_evaluator,
-        troika_test_logits_eval,
-        test_attr_gt,
-        test_obj_gt,
-        test_pair_gt,
-        config
+    # 在测试集上评估Troika模型并打印相关信息
+    troika_test_stats = evaluate_and_print_results(
+        "Troika", test_dataset, test_evaluator, troika_test_logits,
+        test_attr_gt, test_obj_gt, test_pair_gt, config,
+        best_th, unseen_scores, logger
     )
-
-    # 输出Troika测试结果
-    print("\nTroika模型测试结果:")
-    logger.info("Troika模型测试结果:")
-    for key, value in troika_test_stats.items():
-        if isinstance(value, (int, float)):
-            print(f"  {key}: {value:.4f}")
-            logger.info(f"  {key}: {value:.4f}")
-        else:
-            print(f"  {key}: {value}")
-            logger.info(f"  {key}: {value}")
 
     # 释放Troika模型占用的显存
     clear_gpu_memory(troika_model, "Troika", logger)
@@ -583,36 +596,12 @@ def main():
     logger.info(f'使用权重 {best_weight:.4f} 融合测试集预测')
     fused_test_logits = fuse_predictions(dfsp_test_logits, troika_test_logits, best_weight)
     
-    
-    if config.open_world and best_th is not None:
-        print(f'使用阈值: {best_th}')
-        logger.info(f'使用阈值: {best_th}')
-        fused_test_logits = threshold_with_feasibility(
-            fused_test_logits,
-            test_dataset.seen_mask,
-            threshold=best_th,
-            feasiblity=unseen_scores)
-    
-    fusion_test_stats = test(
-        test_dataset,
-        test_evaluator,
-        fused_test_logits,
-        test_attr_gt,
-        test_obj_gt,
-        test_pair_gt,
-        config
+    # 然后评估融合模型（注意这里我们自定义了模型名称以包含权重信息）
+    fusion_test_stats = evaluate_and_print_results(
+        f"融合模型 (Troika权重: {best_weight:.4f})", test_dataset, test_evaluator, fused_test_logits,
+        test_attr_gt, test_obj_gt, test_pair_gt, config,
+        best_th, unseen_scores, logger
     )
-    
-    # 输出融合模型测试结果
-    print(f"\n融合模型测试结果 (Troika权重: {best_weight:.4f}):")
-    logger.info(f"融合模型测试结果 (Troika权重: {best_weight:.4f}):")
-    for key, value in fusion_test_stats.items():
-        if isinstance(value, (int, float)):
-            print(f"  {key}: {value:.4f}")
-            logger.info(f"  {key}: {value:.4f}")
-        else:
-            print(f"  {key}: {value}")
-            logger.info(f"  {key}: {value}")
     
     # 计算并展示提升百分比
     log_section("融合模型提升百分比")
