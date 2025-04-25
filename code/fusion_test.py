@@ -288,6 +288,70 @@ def find_best_weight(val_dataset, evaluator, dfsp_logits, troika_logits,
     
     return best_weight, best_stats
 
+def setup_open_world_threshold(config, val_dataset, val_logits, val_attr_gt, 
+                              val_obj_gt, val_pair_gt, evaluator, logger):
+    """设置开放世界模式的阈值和不可行性分数
+    
+    Args:
+        config: 配置参数
+        val_dataset: 验证数据集
+        val_logits: 模型在验证集上的预测结果 通常使用Troika的预测 
+        val_attr_gt, val_obj_gt, val_pair_gt: 验证集的ground truth
+        evaluator: 评估器对象
+        logger: 日志记录器
+        
+    Returns:
+        tuple: (最佳阈值, 不可行性分数)
+    """
+    best_th = None
+    unseen_scores = None
+    
+    if not config.open_world:
+        return best_th, unseen_scores
+    
+    # 加载可行性分数
+    feasibility_path = os.path.join(DIR_PATH, f'data/feasibility_{config.dataset}.pt')
+    unseen_scores = torch.load(feasibility_path, map_location='cpu')['feasibility']
+    
+    # 如果已指定阈值，直接使用
+    if config.threshold is not None:
+        best_th = config.threshold
+        print(f'使用指定的阈值: {best_th}')
+        logger.info(f'使用指定的阈值: {best_th}')
+        return best_th, unseen_scores
+    
+    # 寻找最佳阈值
+    seen_mask = val_dataset.seen_mask.to('cpu')
+    min_feasibility = (unseen_scores + seen_mask * 10.).min()
+    max_feasibility = (unseen_scores - seen_mask * 10.).max()
+    thresholds = np.linspace(min_feasibility, max_feasibility, num=config.threshold_trials)
+    
+    best_auc = 0.
+    best_th = -10
+    
+    print('寻找最佳阈值...')
+    logger.info('寻找最佳阈值...')
+    
+    for th in thresholds:
+        temp_logits = threshold_with_feasibility(
+            val_logits, val_dataset.seen_mask, threshold=th, feasiblity=unseen_scores)
+        results = test(
+            val_dataset,
+            evaluator,
+            temp_logits,
+            val_attr_gt,
+            val_obj_gt,
+            val_pair_gt,
+            config
+        )
+        auc = results['AUC']
+        if auc > best_auc:
+            best_auc = auc
+            best_th = th
+            print(f'新的最佳阈值: {best_th:.4f}, AUC: {best_auc:.4f}')
+            logger.info(f'新的最佳阈值: {best_th:.4f}, AUC: {best_auc:.4f}')
+    
+    return best_th, unseen_scores
 
 def main():
     # 添加融合模型的参数
@@ -366,54 +430,11 @@ def main():
     evaluator = Evaluator(val_dataset, model=None)
     
     # 处理开放世界设置下的阈值
-    best_th = None
-    unseen_scores = None
-    
-    if config.open_world:
-        if config.threshold is None:
-            # 加载可行性分数
-            feasibility_path = os.path.join(DIR_PATH, f'data/feasibility_{config.dataset}.pt')
-            unseen_scores = torch.load(feasibility_path, map_location='cpu')['feasibility']
-            
-            # 寻找最佳阈值 (使用Troika的预测)
-            seen_mask = val_dataset.seen_mask.to('cpu')
-            min_feasibility = (unseen_scores + seen_mask * 10.).min()
-            max_feasibility = (unseen_scores - seen_mask * 10.).max()
-            thresholds = np.linspace(min_feasibility, max_feasibility, num=config.threshold_trials)
-            
-            best_auc = 0.
-            best_th = -10
-            
-            print('寻找最佳阈值...')
-            logger.info('寻找最佳阈值...')
-            
-            for th in thresholds:
-                temp_logits = threshold_with_feasibility(
-                    troika_val_logits, val_dataset.seen_mask, threshold=th, feasiblity=unseen_scores)
-                results = test(
-                    val_dataset,
-                    evaluator,
-                    temp_logits,
-                    val_attr_gt,
-                    val_obj_gt,
-                    val_pair_gt,
-                    config
-                )
-                auc = results['AUC']
-                if auc > best_auc:
-                    best_auc = auc
-                    best_th = th
-                    print(f'新的最佳阈值: {best_th:.4f}, AUC: {best_auc:.4f}')
-                    logger.info(f'新的最佳阈值: {best_th:.4f}, AUC: {best_auc:.4f}')
-
-        else:
-            best_th = config.threshold
-            print(f'使用指定的阈值: {best_th}')
-            logger.info(f'使用指定的阈值: {best_th}')
-            
-            # 加载可行性分数
-            feasibility_path = os.path.join(DIR_PATH, f'data/feasibility_{config.dataset}.pt')
-            unseen_scores = torch.load(feasibility_path, map_location='cpu')['feasibility']
+    best_th, unseen_scores = setup_open_world_threshold(
+        config, val_dataset, troika_val_logits, 
+        val_attr_gt, val_obj_gt, val_pair_gt, 
+        evaluator, logger
+    )
     
     # 寻找最佳融合权重或使用指定的权重
     if config.fusion_weight is None:
