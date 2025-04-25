@@ -27,11 +27,49 @@ cudnn.benchmark = True
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
-def clear_gpu_memory():
-    """清理GPU显存"""
+def clear_gpu_memory(model=None, model_name=None, logger=None):
+    """清理GPU显存
+    Args:
+        model: 要清理的模型对象，如果为None则只清理通用显存
+        model_name: 模型名称，用于日志记录
+        logger: 日志记录器对象
+    """
+    if model is not None:
+        if model_name and logger:
+            message = f'释放{model_name}模型占用的显存'
+            print(message)
+            logger.info(message)
+        # 先将模型移至CPU
+        model.cpu()
+        # 删除模型
+        del model
+    # 清理通用显存
     torch.cuda.empty_cache()
     gc.collect()
 
+def load_dataset_and_prepare_metadata(config, phase, logger):
+    """加载数据集并准备元数据
+    Returns:
+        dataset: 加载的数据集
+        attributes: 属性列表
+        classes: 类别列表
+        offset: 属性数量
+    """
+    print(f'加载{phase}数据集')
+    logger.info(f'加载{phase}数据集')
+    
+    dataset = CompositionDataset(config.dataset_path,
+                                phase=phase,
+                                split='compositional-split-natural',
+                                open_world=config.open_world)
+    
+    allattrs = dataset.attrs
+    allobj = dataset.objs
+    classes = [cla.replace(".", " ").lower() for cla in allobj]
+    attributes = [attr.replace(".", " ").lower() for attr in allattrs]
+    offset = len(attributes)
+    
+    return dataset, attributes, classes, offset
 
 def load_dfsp_model(dfsp_config, config, attributes, classes, offset, logger):
     """
@@ -292,18 +330,7 @@ def main():
     
     dataset_path = config.dataset_path
     
-    # 加载验证数据集
-    print('加载验证数据集')
-    logger.info('加载验证数据集')
-    val_dataset = CompositionDataset(dataset_path,
-                                    phase='val',
-                                    split='compositional-split-natural',
-                                    open_world=config.open_world)
-    allattrs = val_dataset.attrs
-    allobj = val_dataset.objs
-    classes = [cla.replace(".", " ").lower() for cla in allobj]
-    attributes = [attr.replace(".", " ").lower() for attr in allattrs]
-    offset = len(attributes)
+    val_dataset, attributes, classes, offset = load_dataset_and_prepare_metadata(config, 'val', logger)
 
     # 加载DFSP模型
     print('加载DFSP模型')
@@ -317,11 +344,7 @@ def main():
         dfsp_model, val_dataset, dfsp_config)
     
     # 释放DFSP模型占用的显存
-    print('释放DFSP模型占用的显存')
-    logger.info('释放DFSP模型占用的显存')
-    dfsp_model.cpu()  # 先将模型移至CPU
-    del dfsp_model    # 删除模型
-    clear_gpu_memory()  # 清理显存
+    clear_gpu_memory(dfsp_model, "DFSP", logger)
 
     # 加载Troika模型
     print('加载Troika模型')
@@ -337,11 +360,7 @@ def main():
         troika_model, val_dataset, config)
     
     # 释放Troika模型占用的显存
-    print('释放Troika模型占用的显存')
-    logger.info('释放Troika模型占用的显存')
-    troika_model.cpu()
-    del troika_model
-    clear_gpu_memory()
+    clear_gpu_memory(troika_model, "Troika", logger)
     
     # 初始化评估器
     evaluator = Evaluator(val_dataset, model=None)
@@ -439,14 +458,7 @@ def main():
         logger.info(f"{key}: {round(val_stats[key], 4)}")
     print(result)
     
-    # 加载测试数据集
-    log_section("加载测试数据集")
-    print('加载测试数据集')
-    logger.info('加载测试数据集')
-    test_dataset = CompositionDataset(dataset_path,
-                                      phase='test',
-                                      split='compositional-split-natural',
-                                      open_world=config.open_world)
+    test_dataset, _, _, _ = load_dataset_and_prepare_metadata(config, 'test', logger)
     # 在测试集上评估
     print('在测试集上评估融合模型')
     log_section('在测试集上评估融合模型')
@@ -496,11 +508,7 @@ def main():
             logger.info(f"  {key}: {value}")
 
     # 释放DFSP模型占用的显存
-    print('释放DFSP模型占用的显存')
-    logger.info('释放DFSP模型占用的显存')
-    dfsp_model.cpu()
-    del dfsp_model
-    clear_gpu_memory()
+    clear_gpu_memory(dfsp_model, "DFSP", logger)
 
     troika_model = get_model(config, attributes=attributes, classes=classes, offset=offset).cuda()
     troika_model.load_state_dict(torch.load(config.Troika_model_path))
@@ -547,11 +555,7 @@ def main():
             logger.info(f"  {key}: {value}")
 
     # 释放Troika模型占用的显存
-    print('释放Troika模型占用的显存')
-    logger.info('释放Troika模型占用的显存')
-    troika_model.cpu()
-    del troika_model
-    clear_gpu_memory()
+    clear_gpu_memory(troika_model, "Troika", logger)
     
     # 使用最佳权重融合测试集预测
     print(f'使用权重 {best_weight:.4f} 融合测试集预测')
