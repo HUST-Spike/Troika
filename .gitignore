@@ -2,4 +2,4 @@ code/data
 code/clip_modules/ViT-L-14.pt
 code/log
 code/saved_models
-code/config
+code/config/*
